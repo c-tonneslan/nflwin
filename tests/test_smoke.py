@@ -2,6 +2,8 @@
 
 import json
 import os
+import subprocess
+import sys
 
 import joblib
 import numpy as np
@@ -66,3 +68,18 @@ def test_report_has_metrics():
     xgb_row = next(m for m in rep["metrics"] if m["model"] == "xgboost")
     assert xgb_row["log_loss"] < 0.6
     assert xgb_row["auc"] > 0.8
+
+
+def test_predict_cli_rejects_bad_qtr():
+    """The CLI should refuse a quarter outside 1-5 instead of returning a number."""
+    script = os.path.join(ROOT, "scripts", "predict.py")
+    result = subprocess.run(
+        [
+            sys.executable, script,
+            "--down", "1", "--ydstogo", "10", "--yardline", "50",
+            "--margin", "0", "--seconds-left", "1800", "--qtr", "9",
+        ],
+        capture_output=True, text=True,
+    )
+    assert result.returncode != 0
+    assert "qtr" in result.stderr.lower()

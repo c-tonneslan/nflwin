@@ -54,17 +54,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data/plays.parquet")
     ap.add_argument("--test-season", type=int, default=2023)
+    ap.add_argument("--val-season", type=int, default=2022,
+                    help="season used as validation for xgb early stopping")
     ap.add_argument("--out-dir", default="models")
     args = ap.parse_args()
 
     df = pd.read_parquet(args.data)
     print(f"loaded {len(df):,} plays from {df['season'].min()}-{df['season'].max()}")
 
-    train = df[df["season"] != args.test_season].reset_index(drop=True)
+    train = df[~df["season"].isin([args.val_season, args.test_season])].reset_index(drop=True)
+    val = df[df["season"] == args.val_season].reset_index(drop=True)
     test = df[df["season"] == args.test_season].reset_index(drop=True)
-    print(f"  train: {len(train):,}  test: {len(test):,}")
+    print(f"  train: {len(train):,}  val: {len(val):,}  test: {len(test):,}")
 
     Xtr, ytr = train[FEATURES].values, train["posteam_won"].values
+    Xva, yva = val[FEATURES].values, val["posteam_won"].values
     Xte, yte = test[FEATURES].values, test["posteam_won"].values
 
     os.makedirs(args.out_dir, exist_ok=True)
@@ -86,9 +90,9 @@ def main():
     p_logit = logit.predict_proba(Xte_s)[:, 1]
     results.append(evaluate("logistic", yte, p_logit))
 
-    # gradient boosted trees
+    # gradient boosted trees with early stopping on a held-out season
     xgb = XGBClassifier(
-        n_estimators=500,
+        n_estimators=1000,
         max_depth=5,
         learning_rate=0.05,
         subsample=0.85,
@@ -97,9 +101,11 @@ def main():
         objective="binary:logistic",
         eval_metric="logloss",
         tree_method="hist",
+        early_stopping_rounds=25,
         n_jobs=-1,
     )
-    xgb.fit(Xtr, ytr, eval_set=[(Xte, yte)], verbose=False)
+    xgb.fit(Xtr, ytr, eval_set=[(Xva, yva)], verbose=False)
+    print(f"xgb stopped at iteration {xgb.best_iteration} (val logloss {xgb.best_score:.4f})")
     p_xgb = xgb.predict_proba(Xte)[:, 1]
     results.append(evaluate("xgboost", yte, p_xgb))
 

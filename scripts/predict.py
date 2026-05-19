@@ -27,7 +27,13 @@ def main():
     ap.add_argument("--model", default="models/xgboost.json")
     args = ap.parse_args()
 
-    half = args.seconds_left if args.qtr <= 2 else args.seconds_left - 0
+    if not 1 <= args.qtr <= 5:
+        raise SystemExit("qtr must be 1-5 (5 is overtime)")
+    if not 1 <= args.down <= 4:
+        raise SystemExit("down must be 1-4")
+    if not 1 <= args.yardline <= 99:
+        raise SystemExit("yardline must be 1-99")
+
     if args.qtr <= 2:
         half = max(0, args.seconds_left - 1800)
     else:
