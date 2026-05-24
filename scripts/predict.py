@@ -33,6 +33,10 @@ def main():
         raise SystemExit("down must be 1-4")
     if not 1 <= args.yardline <= 99:
         raise SystemExit("yardline must be 1-99")
+    if not 1 <= args.ydstogo <= 99:
+        raise SystemExit("ydstogo must be 1-99")
+    if args.seconds_left < 0:
+        raise SystemExit("seconds-left can't be negative")
 
     if args.qtr <= 2:
         half = max(0, args.seconds_left - 1800)
